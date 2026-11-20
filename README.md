@@ -23,3 +23,70 @@
 - `docs/topology.drawio` — логическая схема сети
 - `docs/addressing.*` — таблицы адресации и портов
 - `journal.md` — журнал работ
+
+
+## Состав стенда и адресация
+
+| ВМ | IP | Роль | Сервисы и порты |
+|----|----|------|-----------------|
+| WIN-01 | 192.168.10.10 | рабочее место администратора | браузер |
+| CTRL-01 | 192.168.20.10 | управляющий узел, приёмник | receiver.js, Docker, **8080** |
+| MON-01 | 192.168.20.11 | мониторинг | Prometheus **9090**, Grafana **3000** |
+| DB-01 | 192.168.20.12 | хранение истории | сервис хранения, SQLite, **8081** |
+| IOT-01 | 192.168.30.10 | узел IoT | Node-RED, Docker, **1880** |
+| RTR | 192.168.10.1 / 20.1 / 30.1 | маршрутизация между VLAN | — |
+| SW | — | коммутатор VLAN 10/20/30/99 | — |
+
+## Схема обмена данными
+
+```
+Node-RED (IOT-01:1880)
+  ├─ POST /api/readings  → CTRL-01:8080 (журнал) и DB-01:8081 (SQLite)
+  └─ POST /api/actuators → CTRL-01:8080 (FAN-01) и DB-01:8081
+Prometheus (MON-01:9090) ── GET /metrics ──► CTRL-01:8080
+Grafana (MON-01:3000) ── источник prometheus-office ──► Prometheus
+                      └─ правила TEMP-01 / HUM-01 / CTRL-01 ──► Email
+```
+
+Датчики TEMP-01 (server_room, °C) и HUM-01 (work_area, %) отправляют показания каждые 5 секунд.
+Вентилятор FAN-01: температура больше 30 °C — ON, иначе OFF, режим auto.
+
+## Адреса для проверки
+
+- Node-RED: http://192.168.30.10:1880
+- История показаний: http://192.168.20.12:8081
+- Prometheus: http://192.168.20.11:9090
+- Grafana: http://192.168.20.11:3000 (панель `office-controller-lab`)
+
+## Порядок запуска и проверки
+
+1. Открыть проект GNS3, включить все ВМ.
+2. CTRL-01: `cd /root/practice4/ctrl && docker compose -f compose.yml up -d`,
+   проверить `curl http://127.0.0.1:8080/health`.
+3. IOT-01: `cd /root/practice4/iot && docker compose -f compose.yml up -d`,
+   поток Node-RED развёрнут (в репозитории — `flow-fan-mon.json`).
+4. DB-01: `cd /root/practice6 && docker compose -f compose.yml up -d`,
+   проверить `curl http://127.0.0.1:8081/health` и страницу истории.
+5. MON-01: `systemctl status prometheus grafana-server`; в Prometheus цель
+   `office-controller` должна быть UP; в Grafana — панель и три правила.
+
+## Работа №7: что лежит в папке
+
+`docs/screens & file work №7/file`: `prometheus.yml` (цель CTRL-01:8080), `prometheus.service`,
+`datasource.yml`, `dashboard.json` (экспорт панели), `alert-rules.yml`, `contactpoints.yml`,
+`policies.yml`, экспорт правил и контактов, `flow-fan-mon.json`, `receiver-v3.js`.
+
+## Работа №8: что лежит в папке
+
+`docs/screens & file work №8/file`: инструкция заказчику (Word/PDF), журнал работ и испытаний,
+протокол испытаний, снимок состояния, экспорт правил. `screens` — снимки работающего стенда.
+
+## Особенности и известные ограничения
+
+- SMTP Grafana настроен на `kutuzowya@yandex.ru`; письма оповещений доставляются
+  (подтверждено письмами [FIRING] и [RESOLVED] по TEMP-01).
+- На DB-01 SQLite переведён в режим WAL и добавлены индексы (`idx_measurements_latest`,
+  `idx_actuator_latest`): без них запрос последних значений зависал и страница истории
+  оставалась пустой.
+- В Node-RED сохранены потоки предыдущих работ (ручные inject-узлы). Автоматическая отправка
+  выполняется вкладкой «Умный офис: датчики и вентилятор» (TEMP/HUM каждые 5 с).

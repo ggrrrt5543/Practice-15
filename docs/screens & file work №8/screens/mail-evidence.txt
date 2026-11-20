@@ -1,0 +1,7 @@
+Подтверждение доставки оповещений Grafana (получено по IMAP из ящика kutuzowya@yandex.ru)
+
+Thu, 19 Nov 2026 17:43:57 +0300 | [FIRING:1] TEMP-01 no readings Office (ctrl-01 office-controller)
+Thu, 19 Nov 2026 17:54:09 +0300 | [FIRING:1] TEMP-01 no readings Office (ctrl-01 office-controller)
+Thu, 19 Nov 2026 17:55:09 +0300 | [RESOLVED] TEMP-01 no readings Office (ctrl-01 office-controller)
+
+Отправитель: Grafana <kutuzowya@yandex.ru>
