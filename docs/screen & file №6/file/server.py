@@ -18,6 +18,9 @@ EXPECTED = {
 def connect():
  # rw opens an EXISTING file and fails rather than silently creating a new DB.
  c=sqlite3.connect(DB.resolve().as_uri()+'?mode=rw',uri=True,timeout=10)
+ c.execute('PRAGMA journal_mode=WAL')
+ c.execute('PRAGMA busy_timeout=5000')
+ c.execute('PRAGMA synchronous=NORMAL')
  c.row_factory=sqlite3.Row
  return c
 
@@ -152,4 +155,9 @@ if __name__=='__main__':
  except (RuntimeError,sqlite3.Error) as e:
   print('STARTUP ERROR:',e,flush=True);raise SystemExit(1)
  print('SQLite storage ready; existing schema verified; no tables created',flush=True)
- ThreadingHTTPServer(('0.0.0.0',int(os.getenv('PORT','8081'))),Handler).serve_forever()
+ try:
+  with connect() as c:
+   c.execute('CREATE INDEX IF NOT EXISTS idx_measurements_latest ON measurements(source,device_id,metric,timestamp DESC,id DESC)')
+   c.execute('CREATE INDEX IF NOT EXISTS idx_actuator_latest ON actuator_events(timestamp DESC,id DESC)')
+ except Exception as e:print('index init:',e,flush=True)
+ThreadingHTTPServer(('0.0.0.0',int(os.getenv('PORT','8081'))),Handler).serve_forever()
